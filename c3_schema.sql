@@ -179,6 +179,22 @@ CREATE TABLE api_keys (
   secret varchar NOT NULL
 );
 
+CREATE OR REPLACE FUNCTION eventable_trigger() RETURNS TRIGGER AS $$
+DECLARE
+  newid integer;
+  newtype eventable;
+BEGIN
+  newtype := TG_ARGV[0];
+  INSERT INTO event_parents VALUES (DEFAULT, newtype) RETURNING id INTO newid;
+  NEW.id = newid;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON beacons FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('beacon');
+CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON zones FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('zone');
+CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON listeners FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('listener');
+
 CREATE USER gis WITH PASSWORD 'gisdemo';
 ALTER ROLE gis SET search_path = gis,api,public;
 GRANT USAGE ON SCHEMA api TO gis;

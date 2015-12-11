@@ -9,6 +9,8 @@ RUN apt-get -y update &&\
     rm -rf /var/lib/apt/lists/* &&\
     ldconfig
 
+EXPOSE 5432
+
 COPY postgresql.conf /tmp/postgresql.conf
 COPY c3_schema.sql /docker-entrypoint-initdb.d/1.sql
 #COPY c3_demo_data.sql /docker-entrypoint-initdb.d/2.sql
