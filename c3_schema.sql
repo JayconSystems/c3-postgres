@@ -33,7 +33,7 @@ CREATE TABLE event_parents (
 CREATE TABLE zones (
   id integer REFERENCES event_parents PRIMARY KEY,
   name varchar NOT NULL,
-  geom geometry(POLYGON,900913) DEFAULT NULL,
+  geom geometry(POLYGON,3857) DEFAULT NULL,
   color varchar  NOT NULL DEFAULT '#ffffff',
   owner_id integer REFERENCES owner_parents
 );
@@ -56,7 +56,7 @@ CREATE TABLE beacons (
   id integer REFERENCES event_parents PRIMARY KEY,
   state varchar DEFAULT '',
   name varchar DEFAULT NULL,
-  geom geometry(POINT,900913) DEFAULT NULL,
+  geom geometry(POINT,3857) DEFAULT NULL,
   group_id integer REFERENCES beacon_groups DEFAULT NULL,
   major uint2 NOT NULL,
   minor uint2 NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE beacons (
 CREATE TABLE beacon_logs (
   id serial PRIMARY KEY,
   beacon_id integer REFERENCES beacons,
-  geom geometry(POINT,900913),
+  geom geometry(POINT,3857),
   zone_id integer REFERENCES zones,
   timestamp timestamp NOT NULL DEFAULT now(),
   state varchar DEFAULT ''
@@ -121,7 +121,7 @@ CREATE TABLE listeners (
   name varchar DEFAULT NULL,
   mac varchar UNIQUE NOT NULL,
   description text DEFAULT NULL,
-  geom geometry(POINT,900913) DEFAULT NULL,
+  geom geometry(POINT,3857) DEFAULT NULL,
   zone_id integer REFERENCES zones,
   owner_id integer REFERENCES owner_parents,
   last_seen timestamp DEFAULT NULL
@@ -156,7 +156,7 @@ CREATE TABLE orgs (
 CREATE TABLE roi (
   id serial PRIMARY KEY,
   name varchar NOT NULL,
-  geom geometry(POLYGON,900913),
+  geom geometry(POLYGON,3857),
   rast raster,
   owner_id integer REFERENCES owner_parents ON DELETE CASCADE
 );
@@ -192,8 +192,23 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON beacons FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('beacon');
-CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON zones FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('zone');
-CREATE TRIGGER insert_beacon_parent BEFORE INSERT ON listeners FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('listener');
+CREATE TRIGGER insert_zone_parent BEFORE INSERT ON zones FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('zone');
+CREATE TRIGGER insert_listener_parent BEFORE INSERT ON listeners FOR EACH ROW EXECUTE PROCEDURE eventable_trigger('listener');
+
+CREATE OR REPLACE FUNCTION ownable_trigger() RETURNS TRIGGER AS $$
+DECLARE
+  newid integer;
+  newtype owner_type;
+BEGIN
+  newtype := TG_ARGV[0];
+  INSERT INTO owner_parents VALUES (DEFAULT, newtype) RETURNING id INTO newid;
+  NEW.id = newid;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER insert_user_parent BEFORE INSERT ON users FOR EACH ROW EXECUTE PROCEDURE ownable_trigger('user');
+CREATE TRIGGER insert_org_parent BEFORE INSERT ON orgs FOR EACH ROW EXECUTE PROCEDURE ownable_trigger('org');
 
 CREATE USER gis WITH PASSWORD 'gisdemo';
 ALTER ROLE gis SET search_path = gis,api,public;
